@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash } from 'lucide-react';
@@ -17,11 +17,10 @@ const PromoCodesPage = () => {
   const [editingCode, setEditingCode] = useState<PromoCode | null>(null);
   const [formData, setFormData] = useState({
     code: '',
-    type: 'percentage',
+    type: '',
     percentage: 0,
     starts_at: '',
     expires_at: '',
-    usage_limit: 0,
   });
 
   const queryClient = useQueryClient();
@@ -43,7 +42,7 @@ const PromoCodesPage = () => {
     mutationFn: async (data: any) => {
       const { error } = await supabase
         .from('promo_codes')
-        .insert([data]);
+        .insert([{ ...data, usage_limit: 1 }]);
       
       if (error) throw error;
     },
@@ -62,7 +61,7 @@ const PromoCodesPage = () => {
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const { error } = await supabase
         .from('promo_codes')
-        .update(data)
+        .update({ ...data, usage_limit: 1 })
         .eq('id', id);
       
       if (error) throw error;
@@ -99,11 +98,10 @@ const PromoCodesPage = () => {
   const resetForm = () => {
     setFormData({
       code: '',
-      type: 'percentage',
+      type: '',
       percentage: 0,
       starts_at: '',
       expires_at: '',
-      usage_limit: 0,
     });
     setEditingCode(null);
   };
@@ -121,11 +119,10 @@ const PromoCodesPage = () => {
     setEditingCode(code);
     setFormData({
       code: code.code || '',
-      type: code.type || 'percentage',
+      type: code.type || '',
       percentage: code.percentage || 0,
       starts_at: code.starts_at ? new Date(code.starts_at).toISOString().split('T')[0] : '',
       expires_at: code.expires_at ? new Date(code.expires_at).toISOString().split('T')[0] : '',
-      usage_limit: code.usage_limit || 0,
     });
     setIsDialogOpen(true);
   };
@@ -173,20 +170,18 @@ const PromoCodesPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="type">Type</Label>
-                <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="percentage">Percentage</SelectItem>
-                    <SelectItem value="fixed">Fixed Amount</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="type">Description</Label>
+                <Textarea
+                  id="type"
+                  value={formData.type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+                  placeholder="Special discount for new customers"
+                  required
+                />
               </div>
 
               <div>
-                <Label htmlFor="percentage">{formData.type === 'percentage' ? 'Percentage (%)' : 'Amount (EGP)'}</Label>
+                <Label htmlFor="percentage">Percentage (%)</Label>
                 <Input
                   id="percentage"
                   type="number"
@@ -215,17 +210,6 @@ const PromoCodesPage = () => {
                   value={formData.expires_at}
                   onChange={(e) => setFormData(prev => ({ ...prev, expires_at: e.target.value }))}
                   required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="usage_limit">Usage Limit</Label>
-                <Input
-                  id="usage_limit"
-                  type="number"
-                  value={formData.usage_limit}
-                  onChange={(e) => setFormData(prev => ({ ...prev, usage_limit: parseInt(e.target.value) || 0 }))}
-                  placeholder="0 for unlimited"
                 />
               </div>
 
@@ -264,16 +248,16 @@ const PromoCodesPage = () => {
             <CardContent>
               <div className="space-y-2">
                 <p className="text-2xl font-bold text-orange-600">
-                  {code.type === 'percentage' ? `${code.percentage}%` : `${code.percentage} EGP`} OFF
+                  {code.percentage}% OFF
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Description:</strong> {code.type}
                 </p>
                 <p className="text-sm text-gray-600">
                   <strong>Starts:</strong> {new Date(code.starts_at).toLocaleDateString()}
                 </p>
                 <p className="text-sm text-gray-600">
                   <strong>Expires:</strong> {new Date(code.expires_at).toLocaleDateString()}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <strong>Usage Limit:</strong> {code.usage_limit || 'Unlimited'}
                 </p>
               </div>
               <div className="flex justify-end space-x-2 mt-4">

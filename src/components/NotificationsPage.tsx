@@ -2,18 +2,18 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase, NotificationToken } from '@/lib/supabase';
+import { sendFCMNotification } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Bell, Send, Image } from 'lucide-react';
+import { Bell, Send, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const NotificationsPage = () => {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const { data: tokens, isLoading } = useQuery({
     queryKey: ['notificationTokens'],
@@ -28,55 +28,26 @@ const NotificationsPage = () => {
     },
   });
 
-  const uploadNotificationImage = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('notification-pics')
-      .upload(fileName, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage
-      .from('notification-pics')
-      .getPublicUrl(fileName);
-
-    return data.publicUrl;
-  };
-
   const sendNotificationMutation = useMutation({
     mutationFn: async () => {
       if (!tokens || tokens.length === 0) {
         throw new Error('No notification tokens found');
       }
 
-      let imageUrl = '';
-      if (imageFile) {
-        imageUrl = await uploadNotificationImage(imageFile);
+      const tokenList = tokens.map(token => token.token);
+      
+      try {
+        const result = await sendFCMNotification(tokenList, title, body);
+        return result;
+      } catch (error) {
+        console.error('Failed to send FCM notification:', error);
+        throw new Error('Failed to send notification. Please check your Firebase server key configuration.');
       }
-
-      // Here you would typically call your backend API to send FCM notifications
-      // For now, we'll simulate the notification sending
-      const notificationData = {
-        title,
-        body,
-        image: imageUrl,
-        tokens: tokens.map(token => token.token),
-      };
-
-      console.log('Sending notification to tokens:', notificationData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      return notificationData;
     },
     onSuccess: () => {
       toast.success(`Notification sent to ${tokens?.length || 0} devices!`);
       setTitle('');
       setBody('');
-      setImageFile(null);
     },
     onError: (error) => {
       toast.error('Failed to send notification: ' + error.message);
@@ -105,6 +76,29 @@ const NotificationsPage = () => {
           <span>{tokens?.length || 0} Active Devices</span>
         </div>
       </div>
+
+      {/* Firebase Configuration Warning */}
+      <Card className="border-yellow-200 bg-yellow-50">
+        <CardHeader>
+          <CardTitle className="flex items-center text-yellow-800">
+            <AlertTriangle className="h-5 w-5 mr-2" />
+            Firebase Configuration Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-yellow-700 text-sm space-y-2">
+            <p>To send notifications, you need to:</p>
+            <ol className="list-decimal list-inside space-y-1 ml-4">
+              <li>Go to Firebase Console → Project Settings → Cloud Messaging</li>
+              <li>Copy your Server Key</li>
+              <li>Replace 'YOUR_FIREBASE_SERVER_KEY' in src/lib/firebase.ts with your actual server key</li>
+            </ol>
+            <p className="mt-2">
+              <strong>Your Project ID:</strong> food-app-99a54
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Notification Form */}
@@ -139,24 +133,6 @@ const NotificationsPage = () => {
                     className="min-h-[100px]"
                     required
                   />
-                </div>
-
-                <div>
-                  <Label htmlFor="image" className="flex items-center">
-                    <Image className="h-4 w-4 mr-2" />
-                    Notification Image (Optional)
-                  </Label>
-                  <Input
-                    id="image"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  />
-                  {imageFile && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Selected: {imageFile.name}
-                    </p>
-                  )}
                 </div>
 
                 <Button 
@@ -240,15 +216,6 @@ const NotificationsPage = () => {
           <CardContent>
             <div className="bg-gray-100 p-4 rounded-lg max-w-sm">
               <div className="bg-white p-3 rounded-lg shadow-sm">
-                {imageFile && (
-                  <div className="mb-2">
-                    <img 
-                      src={URL.createObjectURL(imageFile)} 
-                      alt="Preview" 
-                      className="w-full h-32 object-cover rounded"
-                    />
-                  </div>
-                )}
                 <h4 className="font-semibold text-gray-900 mb-1">
                   {title || 'Notification Title'}
                 </h4>
@@ -261,7 +228,7 @@ const NotificationsPage = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </div>
       )}
     </div>
   );
