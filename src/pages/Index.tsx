@@ -1,13 +1,23 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import DashboardLayout from '../components/DashboardLayout';
+import MenuItemsPage from '../components/MenuItemsPage';
+import PromoCodesPage from '../components/PromoCodesPage';
+import FeedbackPage from '../components/FeedbackPage';
+import NotificationsPage from '../components/NotificationsPage';
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <DashboardLayout>
+      <Routes>
+        <Route path="/" element={<Navigate to="/menu-items" replace />} />
+        <Route path="/menu-items" element={<MenuItemsPage />} />
+        <Route path="/promo-codes" element={<PromoCodesPage />} />
+        <Route path="/feedback" element={<FeedbackPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+      </Routes>
+    </DashboardLayout>
   );
 };
 
