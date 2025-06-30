@@ -86,6 +86,9 @@ const translations = {
     'dislike': 'Dislike',
     'comment': 'Comment',
     'no_feedback_yet': 'No feedback received yet.',
+    'feedback_deleted': 'Feedback deleted successfully!',
+    'error_deleting_feedback': 'Error deleting feedback',
+    'confirm_delete_feedback': 'Are you sure you want to delete this feedback?',
     
     // Notifications
     'send_notifications': 'Send Notifications',
@@ -189,6 +192,9 @@ const translations = {
     'dislike': 'لم يعجبني',
     'comment': 'تعليق',
     'no_feedback_yet': 'لم يتم استلام أي تقييمات حتى الآن.',
+    'feedback_deleted': 'تم حذف التقييم بنجاح!',
+    'error_deleting_feedback': 'خطأ في حذف التقييم',
+    'confirm_delete_feedback': 'هل أنت متأكد أنك تريد حذف هذا التقييم؟',
     
     // Notifications
     'send_notifications': 'إرسال الإشعارات',

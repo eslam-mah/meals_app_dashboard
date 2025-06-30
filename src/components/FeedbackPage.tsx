@@ -1,13 +1,17 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Feedback, User } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Star, ThumbsUp, ThumbsDown, User as UserIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Star, ThumbsUp, ThumbsDown, User as UserIcon, Trash } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { toast } from 'sonner';
 
 const FeedbackPage = () => {
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
+  
   const { data: feedbacks, isLoading } = useQuery({
     queryKey: ['feedback'],
     queryFn: async () => {
@@ -30,6 +34,30 @@ const FeedbackPage = () => {
       return data as (Feedback & { users: User })[];
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (feedbackId: string) => {
+      const { error } = await supabase
+        .from('feedback')
+        .delete()
+        .eq('id', feedbackId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feedback'] });
+      toast.success(t('feedback_deleted'));
+    },
+    onError: (error) => {
+      toast.error(t('error_deleting_feedback') + ': ' + error.message);
+    },
+  });
+
+  const handleDelete = (feedbackId: string) => {
+    if (window.confirm(t('confirm_delete_feedback'))) {
+      deleteMutation.mutate(feedbackId);
+    }
+  };
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -158,6 +186,19 @@ const FeedbackPage = () => {
                   </p>
                 </div>
               )}
+              
+              {/* Delete Button */}
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => handleDelete(feedback.id)}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash className="h-4 w-4 mr-1" />
+                  {t('delete')}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
