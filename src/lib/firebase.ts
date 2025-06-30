@@ -19,10 +19,11 @@ export const sendFCMNotification = async (tokens: string[], title: string, body:
     });
 
     // Call Supabase edge function for FCM HTTP v1 notifications
-    const response = await fetch('/api/send-notification', {
+    const response = await fetch('https://bklaalgiadeapphjlpra.supabase.co/functions/v1/send-notification', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrbGFhbGdpYWRlYXBwaGpscHJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0NDk5NDYsImV4cCI6MjA2NTAyNTk0Nn0.8Nhtv0krtfJfYCuiNgrceGzCyxe4JOaG25RMo2tpmuU'
       },
       body: JSON.stringify({
         tokens,
