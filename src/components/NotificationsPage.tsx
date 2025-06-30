@@ -228,7 +228,7 @@ const NotificationsPage = () => {
               </div>
             </div>
           </CardContent>
-        </div>
+        </Card>
       )}
     </div>
   );
