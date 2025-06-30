@@ -32,9 +32,13 @@ export const sendFCMNotification = async (tokens: string[], title: string, body:
       }),
     });
 
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      console.error('Edge function error response:', errorText);
+      throw new Error(`Edge function error! status: ${response.status}, message: ${errorText}`);
     }
 
     const result = await response.json();
@@ -51,6 +55,18 @@ export const sendFCMNotification = async (tokens: string[], title: string, body:
     };
   } catch (error) {
     console.error('Error sending FCM HTTP v1 notification:', error);
+    
+    // Enhanced error logging
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      console.error('Network error - possible causes:');
+      console.error('1. Edge function not deployed');
+      console.error('2. CORS issues');
+      console.error('3. Network connectivity problems');
+      console.error('4. Edge function runtime error');
+      
+      throw new Error('Network error: The edge function may not be deployed or accessible. Please check your Supabase project.');
+    }
+    
     throw new Error(`Failed to send notification: ${error.message}`);
   }
 };
