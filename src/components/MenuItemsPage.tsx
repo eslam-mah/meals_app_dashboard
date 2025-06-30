@@ -134,11 +134,23 @@ const MenuItemsPage = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (item: MenuItem) => {
+      // First delete any references in order_items
+      const { error: orderItemsError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('menu_item_id', item.id);
+      
+      if (orderItemsError) {
+        console.error('Error deleting related order items:', orderItemsError);
+        throw orderItemsError;
+      }
+
       // Delete image from storage if exists
       if (item.food_picture) {
         await deleteImageFromStorage(item.food_picture);
       }
 
+      // Now delete the menu item
       const { error } = await supabase
         .from('menu_items')
         .delete()
@@ -151,7 +163,7 @@ const MenuItemsPage = () => {
       toast.success(t('menu_item_deleted'));
     },
     onError: (error) => {
-      toast.error('Error deleting menu item: ' + error.message);
+      toast.error(t('error_deleting_menu_item') + ': ' + error.message);
     },
   });
 
