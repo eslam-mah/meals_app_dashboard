@@ -11,28 +11,18 @@ const firebaseConfig = {
 };
 
 export const sendFCMNotification = async (tokens: string[], title: string, body: string) => {
-  const serverKey = 'YOUR_FIREBASE_SERVER_KEY'; // You need to get this from Firebase Console > Project Settings > Cloud Messaging
-  
-  const payload = {
-    registration_ids: tokens,
-    notification: {
-      title: title,
-      body: body,
-      icon: '/favicon.ico',
-    },
-    data: {
-      click_action: 'FLUTTER_NOTIFICATION_CLICK',
-    },
-  };
-
   try {
-    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+    // Call Supabase edge function for FCM notifications
+    const response = await fetch('/api/send-notification', {
       method: 'POST',
       headers: {
-        'Authorization': `key=${serverKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        tokens,
+        title,
+        body,
+      }),
     });
 
     if (!response.ok) {

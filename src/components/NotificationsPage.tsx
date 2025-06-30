@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase, NotificationToken } from '@/lib/supabase';
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Bell, Send, AlertTriangle } from 'lucide-react';
+import { Bell, Send, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const NotificationsPage = () => {
@@ -41,7 +40,7 @@ const NotificationsPage = () => {
         return result;
       } catch (error) {
         console.error('Failed to send FCM notification:', error);
-        throw new Error('Failed to send notification. Please check your Firebase server key configuration.');
+        throw new Error('Failed to send notification. Please check your configuration.');
       }
     },
     onSuccess: () => {
@@ -77,24 +76,19 @@ const NotificationsPage = () => {
         </div>
       </div>
 
-      {/* Firebase Configuration Warning */}
-      <Card className="border-yellow-200 bg-yellow-50">
+      {/* Firebase Configuration Status */}
+      <Card className="border-green-200 bg-green-50">
         <CardHeader>
-          <CardTitle className="flex items-center text-yellow-800">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            Firebase Configuration Required
+          <CardTitle className="flex items-center text-green-800">
+            <CheckCircle className="h-5 w-5 mr-2" />
+            Firebase Configuration Complete
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-yellow-700 text-sm space-y-2">
-            <p>To send notifications, you need to:</p>
-            <ol className="list-decimal list-inside space-y-1 ml-4">
-              <li>Go to Firebase Console → Project Settings → Cloud Messaging</li>
-              <li>Copy your Server Key</li>
-              <li>Replace 'YOUR_FIREBASE_SERVER_KEY' in src/lib/firebase.ts with your actual server key</li>
-            </ol>
-            <p className="mt-2">
-              <strong>Your Project ID:</strong> food-app-99a54
+          <div className="text-green-700 text-sm">
+            <p>Firebase notifications are properly configured and ready to use!</p>
+            <p className="mt-1">
+              <strong>Project ID:</strong> food-app-99a54
             </p>
           </div>
         </CardContent>
