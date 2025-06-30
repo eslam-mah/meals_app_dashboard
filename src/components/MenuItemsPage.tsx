@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface JSONBItem {
   name_ar: string;
@@ -20,6 +21,7 @@ interface JSONBItem {
 }
 
 const MenuItemsPage = () => {
+  const { t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -28,7 +30,7 @@ const MenuItemsPage = () => {
     name_en: '',
     description_ar: '',
     description_en: '',
-    price: 0,
+    price: '',
     meal_type: 'menu',
     sizes: [] as JSONBItem[],
     extras: [] as JSONBItem[],
@@ -67,6 +69,19 @@ const MenuItemsPage = () => {
     return data.publicUrl;
   };
 
+  const deleteImageFromStorage = async (imageUrl: string) => {
+    try {
+      const fileName = imageUrl.split('/').pop();
+      if (fileName) {
+        await supabase.storage
+          .from('food')
+          .remove([fileName]);
+      }
+    } catch (error) {
+      console.error('Error deleting image from storage:', error);
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       let food_picture = '';
@@ -76,7 +91,7 @@ const MenuItemsPage = () => {
 
       const { error } = await supabase
         .from('menu_items')
-        .insert([{ ...data, food_picture }]);
+        .insert([{ ...data, price: parseFloat(data.price) || 0, food_picture }]);
       
       if (error) throw error;
     },
@@ -84,7 +99,7 @@ const MenuItemsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['menuItems'] });
       setIsDialogOpen(false);
       resetForm();
-      toast.success('Menu item created successfully!');
+      toast.success(t('menu_item_created'));
     },
     onError: (error) => {
       toast.error('Error creating menu item: ' + error.message);
@@ -93,7 +108,7 @@ const MenuItemsPage = () => {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      let updateData = { ...data };
+      let updateData = { ...data, price: parseFloat(data.price) || 0 };
       
       if (imageFile) {
         const food_picture = await uploadImage(imageFile);
@@ -111,7 +126,7 @@ const MenuItemsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['menuItems'] });
       setIsDialogOpen(false);
       resetForm();
-      toast.success('Menu item updated successfully!');
+      toast.success(t('menu_item_updated'));
     },
     onError: (error) => {
       toast.error('Error updating menu item: ' + error.message);
@@ -119,17 +134,22 @@ const MenuItemsPage = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (item: MenuItem) => {
+      // Delete image from storage if exists
+      if (item.food_picture) {
+        await deleteImageFromStorage(item.food_picture);
+      }
+
       const { error } = await supabase
         .from('menu_items')
         .delete()
-        .eq('id', id);
+        .eq('id', item.id);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menuItems'] });
-      toast.success('Menu item deleted successfully!');
+      toast.success(t('menu_item_deleted'));
     },
     onError: (error) => {
       toast.error('Error deleting menu item: ' + error.message);
@@ -142,7 +162,7 @@ const MenuItemsPage = () => {
       name_en: '',
       description_ar: '',
       description_en: '',
-      price: 0,
+      price: '',
       meal_type: 'menu',
       sizes: [],
       extras: [],
@@ -168,7 +188,7 @@ const MenuItemsPage = () => {
       name_en: item.name_en || '',
       description_ar: item.description_ar || '',
       description_en: item.description_en || '',
-      price: item.price || 0,
+      price: item.price ? item.price.toString() : '',
       meal_type: item.meal_type || 'menu',
       sizes: item.sizes || [],
       extras: item.extras || [],
@@ -188,7 +208,7 @@ const MenuItemsPage = () => {
     setFormData(prev => ({
       ...prev,
       [type]: prev[type].map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
+        i === index ? { ...item, [field]: field === 'price' ? (parseFloat(value.toString()) || 0) : value } : item
       )
     }));
   };
@@ -206,27 +226,27 @@ const MenuItemsPage = () => {
         <Label className="text-sm font-medium">{title}</Label>
         <Button type="button" variant="outline" size="sm" onClick={() => addJSONBItem(type)}>
           <Plus className="h-4 w-4 mr-1" />
-          Add {title.slice(0, -1)}
+          {type === 'sizes' ? t('add_size') : type === 'extras' ? t('add_extra') : t('add_beverage')}
         </Button>
       </div>
       {formData[type].map((item, index) => (
         <Card key={index} className="p-3">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <Input
-              placeholder="Arabic Name"
+              placeholder={t('arabic_name')}
               value={item.name_ar}
               onChange={(e) => updateJSONBItem(type, index, 'name_ar', e.target.value)}
             />
             <Input
-              placeholder="English Name"
+              placeholder={t('english_name')}
               value={item.name_en}
               onChange={(e) => updateJSONBItem(type, index, 'name_en', e.target.value)}
             />
             <Input
               type="number"
-              placeholder="Price"
-              value={item.price}
-              onChange={(e) => updateJSONBItem(type, index, 'price', parseFloat(e.target.value) || 0)}
+              placeholder={t('price')}
+              value={item.price === 0 ? '' : item.price}
+              onChange={(e) => updateJSONBItem(type, index, 'price', e.target.value)}
             />
             <Button
               type="button"
@@ -243,28 +263,28 @@ const MenuItemsPage = () => {
   );
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>;
+    return <div className="flex items-center justify-center h-64">{t('loading')}</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Menu Items</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{t('menu_items')}</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Menu Item
+              {t('add_menu_item')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}</DialogTitle>
+              <DialogTitle>{editingItem ? t('edit_menu_item') : t('add_menu_item')}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="name_ar">Arabic Name</Label>
+                  <Label htmlFor="name_ar">{t('arabic_name')}</Label>
                   <Input
                     id="name_ar"
                     value={formData.name_ar}
@@ -273,7 +293,7 @@ const MenuItemsPage = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="name_en">English Name</Label>
+                  <Label htmlFor="name_en">{t('english_name')}</Label>
                   <Input
                     id="name_en"
                     value={formData.name_en}
@@ -285,7 +305,7 @@ const MenuItemsPage = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="description_ar">Arabic Description</Label>
+                  <Label htmlFor="description_ar">{t('arabic_description')}</Label>
                   <Textarea
                     id="description_ar"
                     value={formData.description_ar}
@@ -293,7 +313,7 @@ const MenuItemsPage = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="description_en">English Description</Label>
+                  <Label htmlFor="description_en">{t('english_description')}</Label>
                   <Textarea
                     id="description_en"
                     value={formData.description_en}
@@ -304,33 +324,34 @@ const MenuItemsPage = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="price">Price</Label>
+                  <Label htmlFor="price">{t('price')}</Label>
                   <Input
                     id="price"
                     type="number"
                     step="0.01"
+                    placeholder={t('price')}
                     value={formData.price}
-                    onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="meal_type">Meal Type</Label>
+                  <Label htmlFor="meal_type">{t('meal_type')}</Label>
                   <Select value={formData.meal_type} onValueChange={(value) => setFormData(prev => ({ ...prev, meal_type: value }))}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="menu">Menu</SelectItem>
-                      <SelectItem value="recommended">Recommended</SelectItem>
-                      <SelectItem value="offer">Offer</SelectItem>
+                      <SelectItem value="menu">{t('menu')}</SelectItem>
+                      <SelectItem value="recommended">{t('recommended')}</SelectItem>
+                      <SelectItem value="offer">{t('offer')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="image">Food Image</Label>
+                <Label htmlFor="image">{t('food_image')}</Label>
                 <Input
                   id="image"
                   type="file"
@@ -339,16 +360,16 @@ const MenuItemsPage = () => {
                 />
               </div>
 
-              <JSONBSection title="Sizes" type="sizes" />
-              <JSONBSection title="Extras" type="extras" />
-              <JSONBSection title="Beverages" type="beverages" />
+              <JSONBSection title={t('sizes')} type="sizes" />
+              <JSONBSection title={t('extras')} type="extras" />
+              <JSONBSection title={t('beverages')} type="beverages" />
 
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
+                  {t('cancel')}
                 </Button>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {editingItem ? 'Update' : 'Create'}
+                  {editingItem ? t('update') : t('create')}
                 </Button>
               </div>
             </form>
@@ -372,7 +393,7 @@ const MenuItemsPage = () => {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{item.name_en}</CardTitle>
                 <Badge variant={item.meal_type === 'offer' ? 'destructive' : item.meal_type === 'recommended' ? 'default' : 'secondary'}>
-                  {item.meal_type}
+                  {t(item.meal_type)}
                 </Badge>
               </div>
               <p className="text-sm text-gray-600">{item.name_ar}</p>
@@ -387,7 +408,7 @@ const MenuItemsPage = () => {
                 <Button 
                   variant="destructive" 
                   size="sm" 
-                  onClick={() => deleteMutation.mutate(item.id)}
+                  onClick={() => deleteMutation.mutate(item)}
                   disabled={deleteMutation.isPending}
                 >
                   <Trash className="h-4 w-4" />

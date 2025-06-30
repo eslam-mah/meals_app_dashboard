@@ -8,10 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Bell, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { Bell, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const NotificationsPage = () => {
+  const { t } = useLanguage();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
 
@@ -48,66 +50,45 @@ const NotificationsPage = () => {
       const { successCount, failureCount, total } = result;
       
       if (successCount === total) {
-        toast.success(`All ${total} notifications sent successfully via HTTP v1 API!`);
+        toast.success(t('notification_sent_success_all').replace('{count}', total.toString()));
       } else if (successCount > 0) {
-        toast.success(`${successCount} of ${total} notifications sent successfully. ${failureCount} failed.`);
+        toast.success(t('notification_sent_success_partial').replace('{success}', successCount.toString()).replace('{total}', total.toString()).replace('{failed}', failureCount.toString()));
       } else {
-        toast.error(`All ${total} notifications failed to send.`);
+        toast.error(t('notification_sent_failed_all').replace('{count}', total.toString()));
       }
       
-      // Only clear form if at least some notifications were successful
       if (successCount > 0) {
         setTitle('');
         setBody('');
       }
     },
     onError: (error) => {
-      toast.error('Failed to send notification: ' + error.message);
+      toast.error(t('notification_send_error') + ': ' + error.message);
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !body.trim()) {
-      toast.error('Please fill in both title and body');
+      toast.error(t('notification_form_validation'));
       return;
     }
     sendNotificationMutation.mutate();
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>;
+    return <div className="flex items-center justify-center h-64">{t('loading')}</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Send Notifications</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{t('send_notifications')}</h1>
         <div className="flex items-center text-gray-600">
           <Bell className="h-5 w-5 mr-2" />
-          <span>{tokens?.length || 0} Active Devices</span>
+          <span>{tokens?.length || 0} {t('active_devices')}</span>
         </div>
       </div>
-
-      {/* Firebase HTTP v1 API Status */}
-      <Card className="border-green-200 bg-green-50">
-        <CardHeader>
-          <CardTitle className="flex items-center text-green-800">
-            <CheckCircle className="h-5 w-5 mr-2" />
-            Firebase HTTP v1 API Ready
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-green-700 text-sm">
-            <p>✅ Migrated to FCM HTTP v1 API with OAuth 2.0 authentication</p>
-            <p className="mt-1">✅ Enhanced security with short-lived access tokens</p>
-            <p className="mt-1">✅ Platform-specific message customization enabled</p>
-            <p className="mt-1">
-              <strong>Project ID:</strong> food-app-99a54
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Notification Form */}
@@ -116,29 +97,29 @@ const NotificationsPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Send className="h-5 w-5 mr-2" />
-                Compose Notification (HTTP v1)
+                {t('compose_notification')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="title">Notification Title</Label>
+                  <Label htmlFor="title">{t('notification_title')}</Label>
                   <Input
                     id="title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Enter notification title..."
+                    placeholder={t('notification_title_placeholder')}
                     required
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="body">Notification Body</Label>
+                  <Label htmlFor="body">{t('notification_body')}</Label>
                   <Textarea
                     id="body"
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
-                    placeholder="Enter notification message..."
+                    placeholder={t('notification_body_placeholder')}
                     className="min-h-[100px]"
                     required
                   />
@@ -150,11 +131,11 @@ const NotificationsPage = () => {
                   disabled={sendNotificationMutation.isPending}
                 >
                   {sendNotificationMutation.isPending ? (
-                    'Sending via HTTP v1...'
+                    t('sending_notification')
                   ) : (
                     <>
                       <Send className="h-4 w-4 mr-2" />
-                      Send to {tokens?.length || 0} Devices
+                      {t('send_to_devices').replace('{count}', (tokens?.length || 0).toString())}
                     </>
                   )}
                 </Button>
@@ -167,17 +148,17 @@ const NotificationsPage = () => {
         <div>
           <Card>
             <CardHeader>
-              <CardTitle>Active Devices</CardTitle>
+              <CardTitle>{t('active_devices')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Total Devices:</span>
+                  <span className="text-sm text-gray-600">{t('total_devices')}:</span>
                   <span className="font-semibold">{tokens?.length || 0}</span>
                 </div>
                 
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-900">Platform Breakdown:</h4>
+                  <h4 className="text-sm font-medium text-gray-900">{t('platform_breakdown')}:</h4>
                   {tokens && (
                     <div className="space-y-1">
                       {['android', 'ios', 'web'].map(platform => {
@@ -196,8 +177,7 @@ const NotificationsPage = () => {
                 {tokens && tokens.length > 0 && (
                   <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                     <p className="text-sm text-blue-800">
-                      Your notification will be sent to all active devices. 
-                      Make sure your message is clear and engaging!
+                      {t('notification_info_message')}
                     </p>
                   </div>
                 )}
@@ -205,8 +185,7 @@ const NotificationsPage = () => {
                 {(!tokens || tokens.length === 0) && (
                   <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
                     <p className="text-sm text-yellow-800">
-                      No active devices found. Users need to enable notifications 
-                      in the mobile app first.
+                      {t('no_devices_message')}
                     </p>
                   </div>
                 )}
@@ -216,29 +195,11 @@ const NotificationsPage = () => {
         </div>
       </div>
 
-      {/* HTTP v1 Migration Info */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardHeader>
-          <CardTitle className="flex items-center text-blue-800">
-            <AlertCircle className="h-5 w-5 mr-2" />
-            HTTP v1 API Benefits
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-blue-700 text-sm space-y-2">
-            <p><strong>🔒 Enhanced Security:</strong> OAuth 2.0 tokens instead of server keys</p>
-            <p><strong>🎯 Platform Targeting:</strong> Send customized messages to Android, iOS, and Web</p>
-            <p><strong>⚡ Better Performance:</strong> Individual delivery tracking and error handling</p>
-            <p><strong>🔮 Future-Proof:</strong> Support for new FCM features and platform updates</p>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Preview */}
       {(title || body) && (
         <Card>
           <CardHeader>
-            <CardTitle>Cross-Platform Preview</CardTitle>
+            <CardTitle>{t('notification_preview')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -247,12 +208,12 @@ const NotificationsPage = () => {
                 <h4 className="text-sm font-medium text-gray-600 mb-2">Android</h4>
                 <div className="bg-white p-3 rounded-lg shadow-sm">
                   <h5 className="font-semibold text-gray-900 mb-1">
-                    {title || 'Notification Title'}
+                    {title || t('notification_preview_title')}
                   </h5>
                   <p className="text-sm text-gray-600">
-                    {body || 'Notification body will appear here...'}
+                    {body || t('notification_preview_body')}
                   </p>
-                  <p className="text-xs text-gray-400 mt-2">Food App • now</p>
+                  <p className="text-xs text-gray-400 mt-2">Food App • {t('now')}</p>
                 </div>
               </div>
               
@@ -261,12 +222,12 @@ const NotificationsPage = () => {
                 <h4 className="text-sm font-medium text-gray-600 mb-2">iOS</h4>
                 <div className="bg-white p-3 rounded-lg shadow-sm">
                   <h5 className="font-semibold text-gray-900 mb-1">
-                    {title || 'Notification Title'}
+                    {title || t('notification_preview_title')}
                   </h5>
                   <p className="text-sm text-gray-600">
-                    {body || 'Notification body will appear here...'}
+                    {body || t('notification_preview_body')}
                   </p>
-                  <p className="text-xs text-gray-400 mt-2">Food App • now</p>
+                  <p className="text-xs text-gray-400 mt-2">Food App • {t('now')}</p>
                 </div>
               </div>
               
@@ -275,12 +236,12 @@ const NotificationsPage = () => {
                 <h4 className="text-sm font-medium text-gray-600 mb-2">Web</h4>
                 <div className="bg-white p-3 rounded-lg shadow-sm">
                   <h5 className="font-semibold text-gray-900 mb-1">
-                    {title || 'Notification Title'}
+                    {title || t('notification_preview_title')}
                   </h5>
                   <p className="text-sm text-gray-600">
-                    {body || 'Notification body will appear here...'}
+                    {body || t('notification_preview_body')}
                   </p>
-                  <p className="text-xs text-gray-400 mt-2">Food App • now</p>
+                  <p className="text-xs text-gray-400 mt-2">Food App • {t('now')}</p>
                 </div>
               </div>
             </div>
