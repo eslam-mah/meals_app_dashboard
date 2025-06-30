@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 interface LanguageContextType {
@@ -55,6 +54,12 @@ const translations = {
     'add_promo_code': 'Add Promo Code',
     'edit_promo_code': 'Edit Promo Code',
     'promo_code': 'Promo Code',
+    'promo_code_created': 'Promo code created successfully!',
+    'promo_code_updated': 'Promo code updated successfully!',
+    'promo_code_deleted': 'Promo code deleted successfully!',
+    'error_creating_promo_code': 'Error creating promo code',
+    'error_updating_promo_code': 'Error updating promo code',
+    'error_deleting_promo_code': 'Error deleting promo code',
     'description': 'Description',
     'percentage': 'Percentage (%)',
     'start_date': 'Start Date',
@@ -64,6 +69,22 @@ const translations = {
     'scheduled': 'Scheduled',
     'starts': 'Starts',
     'expires': 'Expires',
+    'off': 'OFF',
+    'promo_description_placeholder': 'Special discount for new customers',
+    'no_promo_codes_yet': 'No promo codes created yet.',
+    
+    // Feedback
+    'customer_feedback': 'Customer Feedback',
+    'total_reviews': 'Total Reviews',
+    'anonymous': 'Anonymous',
+    'food_quality': 'Food Quality',
+    'service_speed': 'Service Speed',
+    'ease_of_ordering': 'Ease of Ordering',
+    'overall_satisfaction': 'Overall Satisfaction',
+    'like': 'Like',
+    'dislike': 'Dislike',
+    'comment': 'Comment',
+    'no_feedback_yet': 'No feedback received yet.',
     
     // Notifications
     'send_notifications': 'Send Notifications',
@@ -135,6 +156,12 @@ const translations = {
     'add_promo_code': 'إضافة كود خصم',
     'edit_promo_code': 'تعديل كود الخصم',
     'promo_code': 'كود الخصم',
+    'promo_code_created': 'تم إنشاء كود الخصم بنجاح!',
+    'promo_code_updated': 'تم تحديث كود الخصم بنجاح!',
+    'promo_code_deleted': 'تم حذف كود الخصم بنجاح!',
+    'error_creating_promo_code': 'خطأ في إنشاء كود الخصم',
+    'error_updating_promo_code': 'خطأ في تحديث كود الخصم',
+    'error_deleting_promo_code': 'خطأ في حذف كود الخصم',
     'description': 'الوصف',
     'percentage': 'النسبة المئوية (%)',
     'start_date': 'تاريخ البداية',
@@ -144,6 +171,22 @@ const translations = {
     'scheduled': 'مجدول',
     'starts': 'يبدأ',
     'expires': 'ينتهي',
+    'off': 'خصم',
+    'promo_description_placeholder': 'خصم خاص للعملاء الجدد',
+    'no_promo_codes_yet': 'لم يتم إنشاء أي أكواد خصم حتى الآن.',
+    
+    // Feedback
+    'customer_feedback': 'تقييمات العملاء',
+    'total_reviews': 'إجمالي التقييمات',
+    'anonymous': 'مجهول',
+    'food_quality': 'جودة الطعام',
+    'service_speed': 'سرعة الخدمة',
+    'ease_of_ordering': 'سهولة الطلب',
+    'overall_satisfaction': 'الرضا العام',
+    'like': 'أعجبني',
+    'dislike': 'لم يعجبني',
+    'comment': 'تعليق',
+    'no_feedback_yet': 'لم يتم استلام أي تقييمات حتى الآن.',
     
     // Notifications
     'send_notifications': 'إرسال الإشعارات',

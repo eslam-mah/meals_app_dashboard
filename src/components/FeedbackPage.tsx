@@ -1,12 +1,13 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, Feedback, User } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Star, ThumbsUp, ThumbsDown, User as UserIcon } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const FeedbackPage = () => {
+  const { t } = useLanguage();
   const { data: feedbacks, isLoading } = useQuery({
     queryKey: ['feedback'],
     queryFn: async () => {
@@ -54,15 +55,15 @@ const FeedbackPage = () => {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>;
+    return <div className="flex items-center justify-center h-64">{t('loading')}</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Customer Feedback</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{t('customer_feedback')}</h1>
         <div className="text-gray-600">
-          Total Reviews: {feedbacks?.length || 0}
+          {t('total_reviews')}: {feedbacks?.length || 0}
         </div>
       </div>
 
@@ -77,7 +78,7 @@ const FeedbackPage = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">
-                      {feedback.users?.name || 'Anonymous'}
+                      {feedback.users?.name || t('anonymous')}
                     </h3>
                     <p className="text-sm text-gray-600">{feedback.phone_number}</p>
                     {feedback.users?.city && (
@@ -104,7 +105,7 @@ const FeedbackPage = () => {
               {/* Individual Ratings */}
               <div className="grid grid-cols-1 gap-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Food Quality:</span>
+                  <span className="text-sm text-gray-600">{t('food_quality')}:</span>
                   <div className="flex items-center">
                     <div className="flex mr-2">
                       {renderStars(feedback.rating1)}
@@ -114,7 +115,7 @@ const FeedbackPage = () => {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Service Speed:</span>
+                  <span className="text-sm text-gray-600">{t('service_speed')}:</span>
                   <div className="flex items-center">
                     <div className="flex mr-2">
                       {renderStars(feedback.rating2)}
@@ -124,7 +125,7 @@ const FeedbackPage = () => {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Ease of Ordering:</span>
+                  <span className="text-sm text-gray-600">{t('ease_of_ordering')}:</span>
                   <div className="flex items-center">
                     <div className="flex mr-2">
                       {renderStars(feedback.rating3)}
@@ -134,7 +135,7 @@ const FeedbackPage = () => {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Overall Satisfaction:</span>
+                  <span className="text-sm text-gray-600">{t('overall_satisfaction')}:</span>
                   <div className="flex items-center">
                     {feedback.overall_rate === 1 ? (
                       <ThumbsUp className="h-5 w-5 text-green-600 mr-2" />
@@ -142,7 +143,7 @@ const FeedbackPage = () => {
                       <ThumbsDown className="h-5 w-5 text-red-600 mr-2" />
                     )}
                     <Badge variant={feedback.overall_rate === 1 ? 'default' : 'destructive'}>
-                      {feedback.overall_rate === 1 ? 'Like' : 'Dislike'}
+                      {feedback.overall_rate === 1 ? t('like') : t('dislike')}
                     </Badge>
                   </div>
                 </div>
@@ -151,7 +152,7 @@ const FeedbackPage = () => {
               {/* Comment */}
               {feedback.comment && (
                 <div className="border-t pt-3">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Comment:</h4>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">{t('comment')}:</h4>
                   <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg italic">
                     "{feedback.comment}"
                   </p>
@@ -164,7 +165,7 @@ const FeedbackPage = () => {
 
       {feedbacks && feedbacks.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">No feedback received yet.</p>
+          <p className="text-gray-500 text-lg">{t('no_feedback_yet')}</p>
         </div>
       )}
     </div>

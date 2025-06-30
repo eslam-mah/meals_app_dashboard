@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, PromoCode } from '@/lib/supabase';
@@ -11,8 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const PromoCodesPage = () => {
+  const { t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCode, setEditingCode] = useState<PromoCode | null>(null);
   const [formData, setFormData] = useState({
@@ -50,10 +51,10 @@ const PromoCodesPage = () => {
       queryClient.invalidateQueries({ queryKey: ['promoCodes'] });
       setIsDialogOpen(false);
       resetForm();
-      toast.success('Promo code created successfully!');
+      toast.success(t('promo_code_created'));
     },
     onError: (error) => {
-      toast.error('Error creating promo code: ' + error.message);
+      toast.error(t('error_creating_promo_code') + ': ' + error.message);
     },
   });
 
@@ -70,10 +71,10 @@ const PromoCodesPage = () => {
       queryClient.invalidateQueries({ queryKey: ['promoCodes'] });
       setIsDialogOpen(false);
       resetForm();
-      toast.success('Promo code updated successfully!');
+      toast.success(t('promo_code_updated'));
     },
     onError: (error) => {
-      toast.error('Error updating promo code: ' + error.message);
+      toast.error(t('error_updating_promo_code') + ': ' + error.message);
     },
   });
 
@@ -88,10 +89,10 @@ const PromoCodesPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['promoCodes'] });
-      toast.success('Promo code deleted successfully!');
+      toast.success(t('promo_code_deleted'));
     },
     onError: (error) => {
-      toast.error('Error deleting promo code: ' + error.message);
+      toast.error(t('error_deleting_promo_code') + ': ' + error.message);
     },
   });
 
@@ -139,27 +140,27 @@ const PromoCodesPage = () => {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>;
+    return <div className="flex items-center justify-center h-64">{t('loading')}</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Promo Codes</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{t('promo_codes')}</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Promo Code
+              {t('add_promo_code')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>{editingCode ? 'Edit Promo Code' : 'Add New Promo Code'}</DialogTitle>
+              <DialogTitle>{editingCode ? t('edit_promo_code') : t('add_promo_code')}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="code">Promo Code</Label>
+                <Label htmlFor="code">{t('promo_code')}</Label>
                 <Input
                   id="code"
                   value={formData.code}
@@ -170,18 +171,18 @@ const PromoCodesPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="type">Description</Label>
+                <Label htmlFor="type">{t('description')}</Label>
                 <Textarea
                   id="type"
                   value={formData.type}
                   onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
-                  placeholder="Special discount for new customers"
+                  placeholder={t('promo_description_placeholder')}
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="percentage">Percentage (%)</Label>
+                <Label htmlFor="percentage">{t('percentage')}</Label>
                 <Input
                   id="percentage"
                   type="number"
@@ -192,7 +193,7 @@ const PromoCodesPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="starts_at">Start Date</Label>
+                <Label htmlFor="starts_at">{t('start_date')}</Label>
                 <Input
                   id="starts_at"
                   type="date"
@@ -203,7 +204,7 @@ const PromoCodesPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="expires_at">Expiry Date</Label>
+                <Label htmlFor="expires_at">{t('expiry_date')}</Label>
                 <Input
                   id="expires_at"
                   type="date"
@@ -215,10 +216,10 @@ const PromoCodesPage = () => {
 
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
+                  {t('cancel')}
                 </Button>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {editingCode ? 'Update' : 'Create'}
+                  {editingCode ? t('update') : t('create')}
                 </Button>
               </div>
             </form>
@@ -239,25 +240,25 @@ const PromoCodesPage = () => {
                     'secondary'
                   }
                 >
-                  {isExpired(code.expires_at) ? 'Expired' : 
-                   isActive(code.starts_at, code.expires_at) ? 'Active' : 
-                   'Scheduled'}
+                  {isExpired(code.expires_at) ? t('expired') : 
+                   isActive(code.starts_at, code.expires_at) ? t('active') : 
+                   t('scheduled')}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <p className="text-2xl font-bold text-orange-600">
-                  {code.percentage}% OFF
+                  {code.percentage}% {t('off')}
                 </p>
                 <p className="text-sm text-gray-600">
-                  <strong>Description:</strong> {code.type}
+                  <strong>{t('description')}:</strong> {code.type}
                 </p>
                 <p className="text-sm text-gray-600">
-                  <strong>Starts:</strong> {new Date(code.starts_at).toLocaleDateString()}
+                  <strong>{t('starts')}:</strong> {new Date(code.starts_at).toLocaleDateString()}
                 </p>
                 <p className="text-sm text-gray-600">
-                  <strong>Expires:</strong> {new Date(code.expires_at).toLocaleDateString()}
+                  <strong>{t('expires')}:</strong> {new Date(code.expires_at).toLocaleDateString()}
                 </p>
               </div>
               <div className="flex justify-end space-x-2 mt-4">
@@ -277,6 +278,12 @@ const PromoCodesPage = () => {
           </Card>
         ))}
       </div>
+
+      {promoCodes && promoCodes.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-500 text-lg">{t('no_promo_codes_yet')}</p>
+        </div>
+      )}
     </div>
   );
 };

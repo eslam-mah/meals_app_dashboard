@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, MenuItem } from '@/lib/supabase';
@@ -205,12 +204,13 @@ const MenuItemsPage = () => {
   };
 
   const updateJSONBItem = (type: 'sizes' | 'extras' | 'beverages', index: number, field: keyof JSONBItem, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [type]: prev[type].map((item, i) => 
-        i === index ? { ...item, [field]: field === 'price' ? (parseFloat(value.toString()) || 0) : value } : item
-      )
-    }));
+    const newFormData = {...formData};
+    if (field === 'price') {
+      newFormData[type][index][field] = parseFloat(value.toString()) || 0;
+    } else {
+      newFormData[type][index][field] = value;
+    }
+    setFormData(newFormData);
   };
 
   const removeJSONBItem = (type: 'sizes' | 'extras' | 'beverages', index: number) => {
@@ -220,47 +220,70 @@ const MenuItemsPage = () => {
     }));
   };
 
-  const JSONBSection = ({ title, type }: { title: string; type: 'sizes' | 'extras' | 'beverages' }) => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">{title}</Label>
-        <Button type="button" variant="outline" size="sm" onClick={() => addJSONBItem(type)}>
-          <Plus className="h-4 w-4 mr-1" />
-          {type === 'sizes' ? t('add_size') : type === 'extras' ? t('add_extra') : t('add_beverage')}
-        </Button>
+  const JSONBSection = ({ title, type }: { title: string; type: 'sizes' | 'extras' | 'beverages' }) => {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium">{title}</Label>
+          <Button type="button" variant="outline" size="sm" onClick={() => addJSONBItem(type)}>
+            <Plus className="h-4 w-4 mr-1" />
+            {type === 'sizes' ? t('add_size') : type === 'extras' ? t('add_extra') : t('add_beverage')}
+          </Button>
+        </div>
+        {formData[type].map((item, index) => (
+          <Card key={index} className="p-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder={t('arabic_name')}
+                  defaultValue={item.name_ar}
+                  onBlur={(e) => {
+                    const newItems = [...formData[type]];
+                    newItems[index] = {...newItems[index], name_ar: e.target.value};
+                    setFormData({...formData, [type]: newItems});
+                  }}
+                />
+              </div>
+              <div>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder={t('english_name')}
+                  defaultValue={item.name_en}
+                  onBlur={(e) => {
+                    const newItems = [...formData[type]];
+                    newItems[index] = {...newItems[index], name_en: e.target.value};
+                    setFormData({...formData, [type]: newItems});
+                  }}
+                />
+              </div>
+              <div>
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  type="text"
+                  placeholder={t('price')}
+                  defaultValue={item.price === 0 ? '' : item.price}
+                  onBlur={(e) => {
+                    const newItems = [...formData[type]];
+                    newItems[index] = {...newItems[index], price: parseFloat(e.target.value) || 0};
+                    setFormData({...formData, [type]: newItems});
+                  }}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => removeJSONBItem(type, index)}
+              >
+                <Trash className="h-4 w-4" />
+              </Button>
+            </div>
+          </Card>
+        ))}
       </div>
-      {formData[type].map((item, index) => (
-        <Card key={index} className="p-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <Input
-              placeholder={t('arabic_name')}
-              value={item.name_ar}
-              onChange={(e) => updateJSONBItem(type, index, 'name_ar', e.target.value)}
-            />
-            <Input
-              placeholder={t('english_name')}
-              value={item.name_en}
-              onChange={(e) => updateJSONBItem(type, index, 'name_en', e.target.value)}
-            />
-            <Input
-              type="number"
-              placeholder={t('price')}
-              value={item.price === 0 ? '' : item.price}
-              onChange={(e) => updateJSONBItem(type, index, 'price', e.target.value)}
-            />
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() => removeJSONBItem(type, index)}
-            >
-              <Trash className="h-4 w-4" />
-            </Button>
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
+    );
+  };
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64">{t('loading')}</div>;

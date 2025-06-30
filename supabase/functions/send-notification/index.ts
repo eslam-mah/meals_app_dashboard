@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { create, getNumericDate, Header, Payload } from "https://deno.land/x/djwt@v2.4/mod.ts"
 
@@ -10,8 +9,22 @@ const corsHeaders = {
 const PROJECT_ID = "food-app-99a54"
 const FCM_ENDPOINT = `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`
 
+// ✅ دالة تحويل PEM إلى Uint8Array بشكل صحيح
+function pemToUint8Array(pem: string): Uint8Array {
+  const b64 = pem
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\r?\n|\r/g, '')
+    .trim();
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -19,7 +32,6 @@ serve(async (req) => {
   try {
     const { tokens, title, body } = await req.json()
 
-    // Firebase service account credentials
     const serviceAccount = {
       type: "service_account",
       project_id: "food-app-99a54",
@@ -29,14 +41,11 @@ serve(async (req) => {
       client_id: "109632897174191251932",
       auth_uri: "https://accounts.google.com/o/oauth2/auth",
       token_uri: "https://oauth2.googleapis.com/token",
-      auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+      auth_provider_x509_cert_url: "https://www.googleapis.com/v1/certs",
       client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40food-app-99a54.iam.gserviceaccount.com",
       universe_domain: "googleapis.com"
     }
 
-    // Generate OAuth 2.0 access token using JWT
-    const now = Math.floor(Date.now() / 1000)
-    
     const header: Header = {
       alg: "RS256",
       typ: "JWT"
@@ -50,19 +59,17 @@ serve(async (req) => {
       iat: getNumericDate(0), // now
     }
 
-    // Create and sign JWT
+    // 👇 استخدم الدالة الجديدة هنا
+    const keyBytes = pemToUint8Array(serviceAccount.private_key);
     const privateKey = await crypto.subtle.importKey(
       "pkcs8",
-      new TextEncoder().encode(serviceAccount.private_key),
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        hash: "SHA-256",
-      },
+      keyBytes,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
       false,
       ["sign"]
-    )
+    );
 
-    const jwt = await create(header, payload, privateKey)
+    const jwt = await create(header, payload, privateKey);
 
     // Exchange JWT for access token
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -97,7 +104,6 @@ serve(async (req) => {
           data: {
             click_action: 'FLUTTER_NOTIFICATION_CLICK',
           },
-          // Platform-specific configurations
           android: {
             notification: {
               icon: '/favicon.ico',
