@@ -1,10 +1,14 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { create, getNumericDate, Header, Payload } from "https://deno.land/x/djwt@v2.4/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+const PROJECT_ID = "food-app-99a54"
+const FCM_ENDPOINT = `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -15,7 +19,7 @@ serve(async (req) => {
   try {
     const { tokens, title, body } = await req.json()
 
-    // Get Firebase service account from Supabase secrets
+    // Firebase service account credentials
     const serviceAccount = {
       type: "service_account",
       project_id: "food-app-99a54",
@@ -30,64 +34,132 @@ serve(async (req) => {
       universe_domain: "googleapis.com"
     }
 
-    // Generate JWT token for Firebase Admin SDK
-    const header = {
+    // Generate OAuth 2.0 access token using JWT
+    const now = Math.floor(Date.now() / 1000)
+    
+    const header: Header = {
       alg: "RS256",
       typ: "JWT"
     }
 
-    const now = Math.floor(Date.now() / 1000)
-    const payload = {
+    const payload: Payload = {
       iss: serviceAccount.client_email,
       scope: "https://www.googleapis.com/auth/firebase.messaging",
       aud: "https://oauth2.googleapis.com/token",
-      exp: now + 3600,
-      iat: now
+      exp: getNumericDate(60 * 60), // 1 hour from now
+      iat: getNumericDate(0), // now
     }
 
-    // Create JWT (simplified version - in production, use a proper JWT library)
-    const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")
-    const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")
+    // Create and sign JWT
+    const privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      new TextEncoder().encode(serviceAccount.private_key),
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        hash: "SHA-256",
+      },
+      false,
+      ["sign"]
+    )
+
+    const jwt = await create(header, payload, privateKey)
+
+    // Exchange JWT for access token
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: jwt,
+      }),
+    })
+
+    if (!tokenResponse.ok) {
+      throw new Error(`Failed to get access token: ${tokenResponse.status}`)
+    }
+
+    const tokenData = await tokenResponse.json()
+    const accessToken = tokenData.access_token
+
+    // Send notifications using HTTP v1 API
+    const results = []
     
-    // For simplicity, we'll use the FCM HTTP v1 API with a simpler approach
-    // In a real implementation, you'd properly sign the JWT
-    
-    const fcmPayload = {
-      message: {
-        notification: {
-          title: title,
-          body: body,
-        },
-        data: {
-          click_action: 'FLUTTER_NOTIFICATION_CLICK',
-        },
-        // Send to multiple tokens by creating multiple messages
-        token: tokens[0] // For now, send to first token
+    for (const token of tokens) {
+      const message = {
+        message: {
+          token: token,
+          notification: {
+            title: title,
+            body: body,
+          },
+          data: {
+            click_action: 'FLUTTER_NOTIFICATION_CLICK',
+          },
+          // Platform-specific configurations
+          android: {
+            notification: {
+              icon: '/favicon.ico',
+              click_action: 'FLUTTER_NOTIFICATION_CLICK',
+            }
+          },
+          apns: {
+            payload: {
+              aps: {
+                badge: 1,
+                sound: 'default',
+              }
+            }
+          },
+          webpush: {
+            notification: {
+              icon: '/favicon.ico',
+            }
+          }
+        }
+      }
+
+      try {
+        const response = await fetch(FCM_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(message),
+        })
+
+        const responseData = await response.json()
+        
+        if (response.ok) {
+          results.push({ success: true, token, response: responseData })
+        } else {
+          results.push({ success: false, token, error: responseData })
+        }
+      } catch (error) {
+        results.push({ success: false, token, error: error.message })
       }
     }
 
-    // Use legacy FCM endpoint for simplicity (you provided server key approach)
-    const legacyPayload = {
-      registration_ids: tokens,
-      notification: {
-        title: title,
-        body: body,
-        icon: '/favicon.ico',
-      },
-      data: {
-        click_action: 'FLUTTER_NOTIFICATION_CLICK',
-      },
-    }
+    const successCount = results.filter(r => r.success).length
+    const failureCount = results.filter(r => !r.success).length
 
-    // For now, we'll return a success response
-    // In production, you'd make the actual FCM API call
-    console.log('Notification payload:', legacyPayload)
+    console.log('FCM HTTP v1 Results:', {
+      total: tokens.length,
+      success: successCount,
+      failures: failureCount,
+      results
+    })
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Notification processed',
-        tokenCount: tokens.length 
+        message: 'Notifications processed with HTTP v1 API',
+        total: tokens.length,
+        success: successCount,
+        failures: failureCount,
+        results: results
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -95,11 +167,15 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error:', error)
+    console.error('FCM HTTP v1 Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: false,
+        error: error.message,
+        details: 'Failed to send notifications using FCM HTTP v1 API'
+      }),
       { 
-        status: 400,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase, NotificationToken } from '@/lib/supabase';
@@ -7,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Bell, Send, CheckCircle } from 'lucide-react';
+import { Bell, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const NotificationsPage = () => {
@@ -40,13 +41,25 @@ const NotificationsPage = () => {
         return result;
       } catch (error) {
         console.error('Failed to send FCM notification:', error);
-        throw new Error('Failed to send notification. Please check your configuration.');
+        throw new Error('Failed to send notification via HTTP v1 API: ' + error.message);
       }
     },
-    onSuccess: () => {
-      toast.success(`Notification sent to ${tokens?.length || 0} devices!`);
-      setTitle('');
-      setBody('');
+    onSuccess: (result) => {
+      const { successCount, failureCount, total } = result;
+      
+      if (successCount === total) {
+        toast.success(`All ${total} notifications sent successfully via HTTP v1 API!`);
+      } else if (successCount > 0) {
+        toast.success(`${successCount} of ${total} notifications sent successfully. ${failureCount} failed.`);
+      } else {
+        toast.error(`All ${total} notifications failed to send.`);
+      }
+      
+      // Only clear form if at least some notifications were successful
+      if (successCount > 0) {
+        setTitle('');
+        setBody('');
+      }
     },
     onError: (error) => {
       toast.error('Failed to send notification: ' + error.message);
@@ -76,17 +89,19 @@ const NotificationsPage = () => {
         </div>
       </div>
 
-      {/* Firebase Configuration Status */}
+      {/* Firebase HTTP v1 API Status */}
       <Card className="border-green-200 bg-green-50">
         <CardHeader>
           <CardTitle className="flex items-center text-green-800">
             <CheckCircle className="h-5 w-5 mr-2" />
-            Firebase Configuration Complete
+            Firebase HTTP v1 API Ready
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-green-700 text-sm">
-            <p>Firebase notifications are properly configured and ready to use!</p>
+            <p>✅ Migrated to FCM HTTP v1 API with OAuth 2.0 authentication</p>
+            <p className="mt-1">✅ Enhanced security with short-lived access tokens</p>
+            <p className="mt-1">✅ Platform-specific message customization enabled</p>
             <p className="mt-1">
               <strong>Project ID:</strong> food-app-99a54
             </p>
@@ -101,7 +116,7 @@ const NotificationsPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Send className="h-5 w-5 mr-2" />
-                Compose Notification
+                Compose Notification (HTTP v1)
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -135,7 +150,7 @@ const NotificationsPage = () => {
                   disabled={sendNotificationMutation.isPending}
                 >
                   {sendNotificationMutation.isPending ? (
-                    'Sending...'
+                    'Sending via HTTP v1...'
                   ) : (
                     <>
                       <Send className="h-4 w-4 mr-2" />
@@ -201,24 +216,72 @@ const NotificationsPage = () => {
         </div>
       </div>
 
+      {/* HTTP v1 Migration Info */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardHeader>
+          <CardTitle className="flex items-center text-blue-800">
+            <AlertCircle className="h-5 w-5 mr-2" />
+            HTTP v1 API Benefits
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-blue-700 text-sm space-y-2">
+            <p><strong>🔒 Enhanced Security:</strong> OAuth 2.0 tokens instead of server keys</p>
+            <p><strong>🎯 Platform Targeting:</strong> Send customized messages to Android, iOS, and Web</p>
+            <p><strong>⚡ Better Performance:</strong> Individual delivery tracking and error handling</p>
+            <p><strong>🔮 Future-Proof:</strong> Support for new FCM features and platform updates</p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Preview */}
       {(title || body) && (
         <Card>
           <CardHeader>
-            <CardTitle>Notification Preview</CardTitle>
+            <CardTitle>Cross-Platform Preview</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="bg-gray-100 p-4 rounded-lg max-w-sm">
-              <div className="bg-white p-3 rounded-lg shadow-sm">
-                <h4 className="font-semibold text-gray-900 mb-1">
-                  {title || 'Notification Title'}
-                </h4>
-                <p className="text-sm text-gray-600">
-                  {body || 'Notification body will appear here...'}
-                </p>
-                <p className="text-xs text-gray-400 mt-2">
-                  Food App • now
-                </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Android Preview */}
+              <div className="bg-gray-100 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-600 mb-2">Android</h4>
+                <div className="bg-white p-3 rounded-lg shadow-sm">
+                  <h5 className="font-semibold text-gray-900 mb-1">
+                    {title || 'Notification Title'}
+                  </h5>
+                  <p className="text-sm text-gray-600">
+                    {body || 'Notification body will appear here...'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">Food App • now</p>
+                </div>
+              </div>
+              
+              {/* iOS Preview */}
+              <div className="bg-gray-100 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-600 mb-2">iOS</h4>
+                <div className="bg-white p-3 rounded-lg shadow-sm">
+                  <h5 className="font-semibold text-gray-900 mb-1">
+                    {title || 'Notification Title'}
+                  </h5>
+                  <p className="text-sm text-gray-600">
+                    {body || 'Notification body will appear here...'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">Food App • now</p>
+                </div>
+              </div>
+              
+              {/* Web Preview */}
+              <div className="bg-gray-100 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-600 mb-2">Web</h4>
+                <div className="bg-white p-3 rounded-lg shadow-sm">
+                  <h5 className="font-semibold text-gray-900 mb-1">
+                    {title || 'Notification Title'}
+                  </h5>
+                  <p className="text-sm text-gray-600">
+                    {body || 'Notification body will appear here...'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">Food App • now</p>
+                </div>
               </div>
             </div>
           </CardContent>

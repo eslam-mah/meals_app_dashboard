@@ -1,5 +1,5 @@
 
-// Firebase configuration for notifications
+// Firebase configuration for HTTP v1 API notifications
 const firebaseConfig = {
   apiKey: 'AIzaSyDQrPnLMCeMDKR9FvgMY_gNzuKFKQw-Sf4',
   appId: '1:425373195781:web:2bdc0dff008f39f529066c',
@@ -12,7 +12,13 @@ const firebaseConfig = {
 
 export const sendFCMNotification = async (tokens: string[], title: string, body: string) => {
   try {
-    // Call Supabase edge function for FCM notifications
+    console.log('Sending FCM notification via HTTP v1 API:', {
+      tokenCount: tokens.length,
+      title,
+      body
+    });
+
+    // Call Supabase edge function for FCM HTTP v1 notifications
     const response = await fetch('/api/send-notification', {
       method: 'POST',
       headers: {
@@ -26,15 +32,25 @@ export const sendFCMNotification = async (tokens: string[], title: string, body:
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
 
     const result = await response.json();
-    console.log('FCM Response:', result);
-    return result;
+    console.log('FCM HTTP v1 Response:', result);
+    
+    // Return detailed results for better error handling
+    return {
+      success: result.success,
+      total: result.total,
+      successCount: result.success,
+      failureCount: result.failures,
+      results: result.results,
+      message: result.message
+    };
   } catch (error) {
-    console.error('Error sending FCM notification:', error);
-    throw error;
+    console.error('Error sending FCM HTTP v1 notification:', error);
+    throw new Error(`Failed to send notification: ${error.message}`);
   }
 };
 
