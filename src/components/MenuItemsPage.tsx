@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
+import imageCompression from 'browser-image-compression'; // <-- NEW!
 
 interface JSONBItem {
   name_ar: string;
@@ -24,6 +25,7 @@ const MenuItemsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // For image preview
   const [formData, setFormData] = useState({
     name_ar: '',
     name_en: '',
@@ -45,19 +47,34 @@ const MenuItemsPage = () => {
         .from('menu_items')
         .select('*')
         .order('created_at', { ascending: false });
-      
       if (error) throw error;
       return data as MenuItem[];
     },
   });
 
+  // ---- IMAGE COMPRESSION FUNCTION ----
+  const compressImage = async (file: File) => {
+    const options = {
+      maxSizeMB: 0.1, // Target around 100 KB
+      maxWidthOrHeight: 1024,
+      useWebWorker: true,
+    };
+    try {
+      const compressedFile = await imageCompression(file, options);
+      return compressedFile;
+    } catch (error) {
+      toast.error('Image compression failed, uploading original');
+      return file;
+    }
+  };
+
   const uploadImage = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
+    const compressed = await compressImage(file); // <-- Compress first
+    const fileExt = compressed.name.split('.').pop();
     const fileName = `${Date.now()}.${fileExt}`;
-    
     const { error: uploadError } = await supabase.storage
       .from('food')
-      .upload(fileName, file);
+      .upload(fileName, compressed);
 
     if (uploadError) throw uploadError;
 
@@ -91,7 +108,7 @@ const MenuItemsPage = () => {
       const { error } = await supabase
         .from('menu_items')
         .insert([{ ...data, price: parseFloat(data.price) || 0, food_picture }]);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -108,7 +125,7 @@ const MenuItemsPage = () => {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       let updateData = { ...data, price: parseFloat(data.price) || 0 };
-      
+
       if (imageFile) {
         const food_picture = await uploadImage(imageFile);
         updateData.food_picture = food_picture;
@@ -118,7 +135,7 @@ const MenuItemsPage = () => {
         .from('menu_items')
         .update(updateData)
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -134,28 +151,25 @@ const MenuItemsPage = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (item: MenuItem) => {
-      // First delete any references in order_items
       const { error: orderItemsError } = await supabase
         .from('order_items')
         .delete()
         .eq('menu_item_id', item.id);
-      
+
       if (orderItemsError) {
         console.error('Error deleting related order items:', orderItemsError);
         throw orderItemsError;
       }
 
-      // Delete image from storage if exists
       if (item.food_picture) {
         await deleteImageFromStorage(item.food_picture);
       }
 
-      // Now delete the menu item
       const { error } = await supabase
         .from('menu_items')
         .delete()
         .eq('id', item.id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -181,6 +195,7 @@ const MenuItemsPage = () => {
     });
     setEditingItem(null);
     setImageFile(null);
+    setPreviewUrl(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -205,6 +220,8 @@ const MenuItemsPage = () => {
       extras: item.extras || [],
       beverages: item.beverages || [],
     });
+    setImageFile(null);
+    setPreviewUrl(item.food_picture || null);
     setIsDialogOpen(true);
   };
 
@@ -391,8 +408,27 @@ const MenuItemsPage = () => {
                   id="image"
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                  onChange={async (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      const file = e.target.files[0];
+                      const compressedFile = await compressImage(file);
+                      setImageFile(compressedFile);
+                      setPreviewUrl(URL.createObjectURL(compressedFile));
+                    } else {
+                      setImageFile(null);
+                      setPreviewUrl(null);
+                    }
+                  }}
                 />
+                {previewUrl && (
+                  <div className="mt-2 w-32 h-32 flex items-center justify-center border rounded bg-white overflow-hidden">
+                    <img
+                      src={previewUrl}
+                      alt="preview"
+                      className="object-contain w-full h-full"
+                    />
+                  </div>
+                )}
               </div>
 
               <JSONBSection title={t('sizes')} type="sizes" />
@@ -416,11 +452,11 @@ const MenuItemsPage = () => {
         {menuItems?.map((item) => (
           <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
             {item.food_picture && (
-              <div className="h-48 overflow-hidden">
+              <div className="h-48 flex items-center justify-center bg-white overflow-hidden">
                 <img 
                   src={item.food_picture} 
                   alt={item.name_en} 
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
               </div>
             )}
