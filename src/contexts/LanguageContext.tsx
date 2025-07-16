@@ -14,7 +14,8 @@ const translations = {
     'feedback': 'Feedback',
     'notifications': 'Notifications',
     'dashboard_title': 'Food App Dashboard',
-    
+    'recommended_items': 'Recommended Items',
+    'offer_items':'Offer Items'  ,
     // Common
     'loading': 'Loading...',
     'cancel': 'Cancel',
@@ -120,7 +121,8 @@ const translations = {
     'feedback': 'التقييمات',
     'notifications': 'الإشعارات',
     'dashboard_title': 'لوحة تحكم تطبيق الطعام',
-    
+    'recommended_items': 'الاكثر مبيعا',
+    'offer_items':'العروض'  ,
     // Common
     'loading': 'جاري التحميل...',
     'cancel': 'إلغاء',

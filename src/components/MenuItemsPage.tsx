@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Edit, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -37,15 +38,17 @@ const MenuItemsPage = () => {
     extras: [] as JSONBItem[],
     beverages: [] as JSONBItem[],
   });
+  const [activeTab, setActiveTab] = useState('menu');
 
   const queryClient = useQueryClient();
 
   const { data: menuItems, isLoading } = useQuery({
-    queryKey: ['menuItems'],
+    queryKey: ['menuItems', activeTab],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('menu_items')
         .select('*')
+        .eq('meal_type', activeTab)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as MenuItem[];
@@ -237,7 +240,7 @@ const MenuItemsPage = () => {
     if (field === 'price') {
       newFormData[type][index][field] = parseFloat(value.toString()) || 0;
     } else {
-      newFormData[type][index][field] = value;
+      newFormData[type][index][field] = value.toString();
     }
     setFormData(newFormData);
   };
@@ -266,24 +269,16 @@ const MenuItemsPage = () => {
                 <input
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   placeholder={t('arabic_name')}
-                  defaultValue={item.name_ar}
-                  onBlur={(e) => {
-                    const newItems = [...formData[type]];
-                    newItems[index] = {...newItems[index], name_ar: e.target.value};
-                    setFormData({...formData, [type]: newItems});
-                  }}
+                  value={item.name_ar}
+                  onChange={(e) => updateJSONBItem(type, index, 'name_ar', e.target.value)}
                 />
               </div>
               <div>
                 <input
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   placeholder={t('english_name')}
-                  defaultValue={item.name_en}
-                  onBlur={(e) => {
-                    const newItems = [...formData[type]];
-                    newItems[index] = {...newItems[index], name_en: e.target.value};
-                    setFormData({...formData, [type]: newItems});
-                  }}
+                  value={item.name_en}
+                  onChange={(e) => updateJSONBItem(type, index, 'name_en', e.target.value)}
                 />
               </div>
               <div>
@@ -291,11 +286,9 @@ const MenuItemsPage = () => {
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   type="text"
                   placeholder={t('price')}
-                  defaultValue={item.price === 0 ? '' : item.price}
-                  onBlur={(e) => {
-                    const newItems = [...formData[type]];
-                    newItems[index] = {...newItems[index], price: parseFloat(e.target.value) || 0};
-                    setFormData({...formData, [type]: newItems});
+                  value={item.price === 0 ? '' : item.price.toString()}
+                  onChange={(e) => {
+                    updateJSONBItem(type, index, 'price', e.target.value);
                   }}
                 />
               </div>
@@ -313,6 +306,46 @@ const MenuItemsPage = () => {
       </div>
     );
   };
+
+  const MenuItemCard = ({ item }: { item: MenuItem }) => (
+    <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+      {item.food_picture && (
+        <div className="h-48 flex items-center justify-center bg-white overflow-hidden">
+          <img 
+            src={item.food_picture} 
+            alt={item.name_en} 
+            className="w-full h-full object-contain"
+          />
+        </div>
+      )}
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">{item.name_en}</CardTitle>
+          <Badge variant={item.meal_type === 'offer' ? 'destructive' : item.meal_type === 'recommended' ? 'default' : 'secondary'}>
+            {t(item.meal_type)}
+          </Badge>
+        </div>
+        <p className="text-sm text-gray-600">{item.name_ar}</p>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-gray-600 mb-2">{item.description_en}</p>
+        <p className="text-lg font-bold text-orange-600 mb-4">EGP {item.price}</p>
+        <div className="flex justify-end space-x-2">
+          <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={() => deleteMutation.mutate(item)}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64">{t('loading')}</div>;
@@ -448,47 +481,37 @@ const MenuItemsPage = () => {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {menuItems?.map((item) => (
-          <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-            {item.food_picture && (
-              <div className="h-48 flex items-center justify-center bg-white overflow-hidden">
-                <img 
-                  src={item.food_picture} 
-                  alt={item.name_en} 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            )}
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{item.name_en}</CardTitle>
-                <Badge variant={item.meal_type === 'offer' ? 'destructive' : item.meal_type === 'recommended' ? 'default' : 'secondary'}>
-                  {t(item.meal_type)}
-                </Badge>
-              </div>
-              <p className="text-sm text-gray-600">{item.name_ar}</p>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600 mb-2">{item.description_en}</p>
-              <p className="text-lg font-bold text-orange-600 mb-4">EGP {item.price}</p>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  onClick={() => deleteMutation.mutate(item)}
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="menu">{t('menu')}</TabsTrigger>
+          <TabsTrigger value="recommended">{t('recommended')}</TabsTrigger>
+          <TabsTrigger value="offer">{t('offer')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="menu">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('menu_items')}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {menuItems?.map((item) => (
+              <MenuItemCard key={item.id} item={item} />
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="recommended">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('recommended_items')}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {menuItems?.map((item) => (
+              <MenuItemCard key={item.id} item={item} />
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="offer">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('offer_items')}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {menuItems?.map((item) => (
+              <MenuItemCard key={item.id} item={item} />
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
