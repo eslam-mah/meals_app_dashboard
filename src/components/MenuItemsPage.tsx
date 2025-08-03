@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Edit, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
-import imageCompression from 'browser-image-compression'; // <-- NEW!
+import imageCompression from 'browser-image-compression';
 
 interface JSONBItem {
   name_ar: string;
@@ -21,12 +21,41 @@ interface JSONBItem {
   price: number;
 }
 
+// ImageKit credentials
+const IMAGEKIT_PUBLIC_KEY = "public_FnsosheeV3lFFkkFDLS36KoRilc=";
+const IMAGEKIT_URL_ENDPOINT = "https://ik.imagekit.io/rpyi6a99m";
+const IMAGEKIT_AUTH_ENDPOINT = "https://bklaalgiadeapphjlpra.supabase.co/functions/v1/imagekit-auth";
+
+async function uploadToImageKit(file: File): Promise<string> {
+  const authRes = await fetch(IMAGEKIT_AUTH_ENDPOINT, { method: 'GET' });
+  const auth = await authRes.json();
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('fileName', file.name);
+  formData.append('publicKey', IMAGEKIT_PUBLIC_KEY);
+  formData.append('signature', auth.signature);
+  formData.append('expire', auth.expire);
+  formData.append('token', auth.token);
+  formData.append('folder', '/');
+  const ikRes = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+    method: 'POST',
+    body: formData
+  });
+  const ikData = await ikRes.json();
+  if (ikRes.ok && ikData.url) return ikData.url;
+  throw new Error(ikData.message || 'Failed to upload image');
+}
+
 const MenuItemsPage = () => {
   const { t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // For image preview
+
+  // ImageKit & compression states
+  const [imageKitUrl, setImageKitUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isImageUploading, setIsImageUploading] = useState(false);
+
   const [formData, setFormData] = useState({
     name_ar: '',
     name_en: '',
@@ -39,7 +68,6 @@ const MenuItemsPage = () => {
     beverages: [] as JSONBItem[],
   });
   const [activeTab, setActiveTab] = useState('menu');
-
   const queryClient = useQueryClient();
 
   const { data: menuItems, isLoading } = useQuery({
@@ -55,63 +83,34 @@ const MenuItemsPage = () => {
     },
   });
 
-  // ---- IMAGE COMPRESSION FUNCTION ----
-  const compressImage = async (file: File) => {
-    const options = {
-      maxSizeMB: 0.1, // Target around 100 KB
-      maxWidthOrHeight: 1024,
-      useWebWorker: true,
-    };
+  // ---- Image Compression + Upload handler (ONE function) ----
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImageUploading(true);
     try {
-      const compressedFile = await imageCompression(file, options);
-      return compressedFile;
-    } catch (error) {
-      toast.error('Image compression failed, uploading original');
-      return file;
+      const options = { maxSizeMB: 0.25, maxWidthOrHeight: 1000, useWebWorker: true };
+      const compressed = await imageCompression(file, options);
+      setPreviewUrl(URL.createObjectURL(compressed));
+      // upload immediately
+      const url = await uploadToImageKit(compressed);
+      setImageKitUrl(url);
+      toast.success('Image uploaded!');
+    } catch (err: any) {
+      toast.error('Image upload failed: ' + (err.message || ''));
+      setImageKitUrl(null);
+      setPreviewUrl(null);
     }
+    setIsImageUploading(false);
   };
 
-  const uploadImage = async (file: File): Promise<string> => {
-    const compressed = await compressImage(file); // <-- Compress first
-    const fileExt = compressed.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const { error: uploadError } = await supabase.storage
-      .from('food')
-      .upload(fileName, compressed);
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage
-      .from('food')
-      .getPublicUrl(fileName);
-
-    return data.publicUrl;
-  };
-
-  const deleteImageFromStorage = async (imageUrl: string) => {
-    try {
-      const fileName = imageUrl.split('/').pop();
-      if (fileName) {
-        await supabase.storage
-          .from('food')
-          .remove([fileName]);
-      }
-    } catch (error) {
-      console.error('Error deleting image from storage:', error);
-    }
-  };
-
+  // --- Mutations ---
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      let food_picture = '';
-      if (imageFile) {
-        food_picture = await uploadImage(imageFile);
-      }
-
+      let food_picture = imageKitUrl || '';
       const { error } = await supabase
         .from('menu_items')
         .insert([{ ...data, price: parseFloat(data.price) || 0, food_picture }]);
-
       if (error) throw error;
     },
     onSuccess: () => {
@@ -128,17 +127,11 @@ const MenuItemsPage = () => {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       let updateData = { ...data, price: parseFloat(data.price) || 0 };
-
-      if (imageFile) {
-        const food_picture = await uploadImage(imageFile);
-        updateData.food_picture = food_picture;
-      }
-
+      if (imageKitUrl) updateData.food_picture = imageKitUrl;
       const { error } = await supabase
         .from('menu_items')
         .update(updateData)
         .eq('id', id);
-
       if (error) throw error;
     },
     onSuccess: () => {
@@ -162,10 +155,6 @@ const MenuItemsPage = () => {
       if (orderItemsError) {
         console.error('Error deleting related order items:', orderItemsError);
         throw orderItemsError;
-      }
-
-      if (item.food_picture) {
-        await deleteImageFromStorage(item.food_picture);
       }
 
       const { error } = await supabase
@@ -197,12 +186,21 @@ const MenuItemsPage = () => {
       beverages: [],
     });
     setEditingItem(null);
-    setImageFile(null);
+    setImageKitUrl(null);
     setPreviewUrl(null);
+    setIsImageUploading(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isImageUploading) {
+      toast.error('Please wait for the image to finish uploading.');
+      return;
+    }
+    if (!imageKitUrl) {
+      toast.error('Please upload an image.');
+      return;
+    }
     if (editingItem) {
       updateMutation.mutate({ id: editingItem.id, data: formData });
     } else {
@@ -223,7 +221,7 @@ const MenuItemsPage = () => {
       extras: item.extras || [],
       beverages: item.beverages || [],
     });
-    setImageFile(null);
+    setImageKitUrl(item.food_picture || null);
     setPreviewUrl(item.food_picture || null);
     setIsDialogOpen(true);
   };
@@ -236,7 +234,7 @@ const MenuItemsPage = () => {
   };
 
   const updateJSONBItem = (type: 'sizes' | 'extras' | 'beverages', index: number, field: keyof JSONBItem, value: string | number) => {
-    const newFormData = {...formData};
+    const newFormData = { ...formData };
     if (field === 'price') {
       newFormData[type][index][field] = parseFloat(value.toString()) || 0;
     } else {
@@ -252,68 +250,66 @@ const MenuItemsPage = () => {
     }));
   };
 
-  const JSONBSection = ({ title, type }: { title: string; type: 'sizes' | 'extras' | 'beverages' }) => {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">{title}</Label>
-          <Button type="button" variant="outline" size="sm" onClick={() => addJSONBItem(type)}>
-            <Plus className="h-4 w-4 mr-1" />
-            {type === 'sizes' ? t('add_size') : type === 'extras' ? t('add_extra') : t('add_beverage')}
-          </Button>
-        </div>
-        {formData[type].map((item, index) => (
-          <Card key={index} className="p-3">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <div>
-                <input
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder={t('arabic_name')}
-                  value={item.name_ar}
-                  onChange={(e) => updateJSONBItem(type, index, 'name_ar', e.target.value)}
-                />
-              </div>
-              <div>
-                <input
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder={t('english_name')}
-                  value={item.name_en}
-                  onChange={(e) => updateJSONBItem(type, index, 'name_en', e.target.value)}
-                />
-              </div>
-              <div>
-                <input
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  type="text"
-                  placeholder={t('price')}
-                  value={item.price === 0 ? '' : item.price.toString()}
-                  onChange={(e) => {
-                    updateJSONBItem(type, index, 'price', e.target.value);
-                  }}
-                />
-              </div>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={() => removeJSONBItem(type, index)}
-              >
-                <Trash className="h-4 w-4" />
-              </Button>
-            </div>
-          </Card>
-        ))}
+  const JSONBSection = ({ title, type }: { title: string; type: 'sizes' | 'extras' | 'beverages' }) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">{title}</Label>
+        <Button type="button" variant="outline" size="sm" onClick={() => addJSONBItem(type)}>
+          <Plus className="h-4 w-4 mr-1" />
+          {type === 'sizes' ? t('add_size') : type === 'extras' ? t('add_extra') : t('add_beverage')}
+        </Button>
       </div>
-    );
-  };
+      {formData[type].map((item, index) => (
+        <Card key={index} className="p-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder={t('arabic_name')}
+                value={item.name_ar}
+                onChange={(e) => updateJSONBItem(type, index, 'name_ar', e.target.value)}
+              />
+            </div>
+            <div>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder={t('english_name')}
+                value={item.name_en}
+                onChange={(e) => updateJSONBItem(type, index, 'name_en', e.target.value)}
+              />
+            </div>
+            <div>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                type="text"
+                placeholder={t('price')}
+                value={item.price === 0 ? '' : item.price.toString()}
+                onChange={(e) => {
+                  updateJSONBItem(type, index, 'price', e.target.value);
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => removeJSONBItem(type, index)}
+            >
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
 
   const MenuItemCard = ({ item }: { item: MenuItem }) => (
     <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
       {item.food_picture && (
         <div className="h-48 flex items-center justify-center bg-white overflow-hidden">
-          <img 
-            src={item.food_picture} 
-            alt={item.name_en} 
+          <img
+            src={item.food_picture}
+            alt={item.name_en}
             className="w-full h-full object-contain"
           />
         </div>
@@ -334,9 +330,9 @@ const MenuItemsPage = () => {
           <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
             <Edit className="h-4 w-4" />
           </Button>
-          <Button 
-            variant="destructive" 
-            size="sm" 
+          <Button
+            variant="destructive"
+            size="sm"
             onClick={() => deleteMutation.mutate(item)}
             disabled={deleteMutation.isPending}
           >
@@ -435,23 +431,14 @@ const MenuItemsPage = () => {
                 </div>
               </div>
 
+              {/* ---- Image Upload (auto, no button) ---- */}
               <div>
-                <Label htmlFor="image">{t('food_image')}</Label>
+                <Label>{t('food_image')}</Label>
                 <Input
-                  id="image"
                   type="file"
                   accept="image/*"
-                  onChange={async (e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      const file = e.target.files[0];
-                      const compressedFile = await compressImage(file);
-                      setImageFile(compressedFile);
-                      setPreviewUrl(URL.createObjectURL(compressedFile));
-                    } else {
-                      setImageFile(null);
-                      setPreviewUrl(null);
-                    }
-                  }}
+                  onChange={handleImageChange}
+                  disabled={isImageUploading}
                 />
                 {previewUrl && (
                   <div className="mt-2 w-32 h-32 flex items-center justify-center border rounded bg-white overflow-hidden">
@@ -462,6 +449,7 @@ const MenuItemsPage = () => {
                     />
                   </div>
                 )}
+                {isImageUploading && <div style={{ color: 'orange' }}>{t('loading')} ... {t('image_uploading') || 'Uploading image, please wait...'}</div>}
               </div>
 
               <JSONBSection title={t('sizes')} type="sizes" />
@@ -472,7 +460,10 @@ const MenuItemsPage = () => {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   {t('cancel')}
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending || updateMutation.isPending || isImageUploading || !imageKitUrl}
+                >
                   {editingItem ? t('update') : t('create')}
                 </Button>
               </div>
